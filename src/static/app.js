@@ -20,14 +20,76 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        // Create participants list HTML
+        let participantsHTML = "";
+        if (details.participants && details.participants.length > 0) {
+          participantsHTML = `
+            <div class="participants-section">
+              <strong>Participants:</strong>
+              <ul class="participants-list no-bullets">
+                ${details.participants.map(p => `
+                  <li>
+                    <span class="participant-email">${p}</span>
+                    <button class="delete-participant-btn" title="Remove" data-activity="${name}" data-email="${p}">✖</button>
+                  </li>
+                `).join("")}
+              </ul>
+            </div>
+          `;
+        } else {
+          participantsHTML = `
+            <div class="participants-section empty">
+              <em>No participants yet</em>
+            </div>
+          `;
+        }
+
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          ${participantsHTML}
         `;
 
         activitiesList.appendChild(activityCard);
+
+        // 削除ボタンのイベントリスナーを追加
+        setTimeout(() => {
+          const deleteBtns = activityCard.querySelectorAll(".delete-participant-btn");
+          deleteBtns.forEach(btn => {
+            btn.addEventListener("click", async (e) => {
+              const activityName = btn.getAttribute("data-activity");
+              const email = btn.getAttribute("data-email");
+              try {
+                const response = await fetch(
+                  `/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`,
+                  {
+                    method: "DELETE",
+                  }
+                );
+                const result = await response.json();
+                if (response.ok) {
+                  messageDiv.textContent = result.message || "Participant removed.";
+                  messageDiv.className = "success";
+                  fetchActivities(); // 再読み込み
+                } else {
+                  messageDiv.textContent = result.detail || "Failed to remove participant.";
+                  messageDiv.className = "error";
+                }
+                messageDiv.classList.remove("hidden");
+                setTimeout(() => {
+                  messageDiv.classList.add("hidden");
+                }, 5000);
+              } catch (error) {
+                messageDiv.textContent = "Failed to remove participant. Please try again.";
+                messageDiv.className = "error";
+                messageDiv.classList.remove("hidden");
+                console.error("Error removing participant:", error);
+              }
+            });
+          });
+        }, 0);
 
         // Add option to select dropdown
         const option = document.createElement("option");
@@ -62,6 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        fetchActivities(); // 参加登録後にアクティビティ一覧を更新
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
